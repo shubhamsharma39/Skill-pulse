@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SkillPulse - Track Your Learning</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <script>
         // Prevent flash of wrong theme on page load
         (function() {
@@ -20,7 +28,7 @@
     <header class="header">
         <div class="header-content">
             <h1>SkillPulse</h1>
-            <p>Track your skills. Log your learning. Ship via GitHub Actions.</p>
+            <p>Track your skills. Log your learning. Level up.</p>
         </div>
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">&#127769;</button>
     </header>
@@ -46,9 +54,29 @@
             </div>
         </div>
 
+        <!-- Analytics and Activity Feed -->
+        <div class="dashboard-grid">
+            <div class="card analytics-card">
+                <div class="section-header">
+                    <h2>Learning Distribution</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+            <div class="card activity-card">
+                <div class="section-header">
+                    <h2>Recent Activity</h2>
+                </div>
+                <div id="activity-feed" class="activity-feed">
+                    <div class="empty-state">Loading activity...</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Skills Section -->
-        <div class="section-header">
-            <h2>My Skills</h2>
+        <div class="section-header" style="margin-top: 2rem;">
+            <h2>My Skills Library</h2>
             <button class="btn btn-primary" onclick="openAddModal()">+ Add Skill</button>
         </div>
 
@@ -77,6 +105,7 @@
                         <option value="Programming">Programming</option>
                         <option value="Databases">Databases</option>
                         <option value="Security">Security</option>
+                        <option value="Design">Design</option>
                         <option value="Other">Other</option>
                     </select>
                 </div>

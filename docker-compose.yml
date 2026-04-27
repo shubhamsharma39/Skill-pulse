@@ -22,7 +22,7 @@ services:
 
   # Go Backend API
   backend:
-    image: ${DOCKERHUB_USERNAME}/skillpulse-backend:latest
+    build: ./backend
     restart: unless-stopped
     environment:
       DB_HOST: db
@@ -40,7 +40,7 @@ services:
     image: nginx:alpine
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8081:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
