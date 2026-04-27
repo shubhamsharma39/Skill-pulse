@@ -1,43 +1,11 @@
 const API = '/api';
 
-// Theme Management
-function getPreferredTheme() {
-    const stored = localStorage.getItem('skillpulse-theme');
-    if (stored) return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('skillpulse-theme', theme);
-    const btn = document.getElementById('theme-toggle');
-    if (btn) btn.textContent = theme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
-    
-    // Update Chart theme if exists
-    if (window.categoryChartInstance) {
-        updateChartTheme();
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    applyTheme(getPreferredTheme());
-
-    const toggleBtn = document.getElementById('theme-toggle');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', () => {
-            const current = document.documentElement.getAttribute('data-theme');
-            applyTheme(current === 'dark' ? 'light' : 'dark');
-        });
-    }
-});
-
 // State
 let skills = [];
 let dashboard = {};
 let recentLogs = [];
 
 // DOM Elements
-const statsContainer = document.getElementById('stats');
 const skillsGrid = document.getElementById('skills-grid');
 const activityFeed = document.getElementById('activity-feed');
 const addSkillModal = document.getElementById('add-skill-modal');
@@ -50,6 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDashboard();
     loadSkills();
     loadRecentLogs();
+    
+    // Live Clock
+    setInterval(() => {
+        const timeEl = document.getElementById('live-timestamp');
+        if (timeEl) {
+            const now = new Date();
+            timeEl.textContent = `> LOCAL_TIME: ${now.toLocaleTimeString()}`;
+        }
+    }, 1000);
 });
 
 // API Calls
@@ -58,6 +35,7 @@ async function loadDashboard() {
         const res = await fetch(`${API}/dashboard`);
         dashboard = await res.json();
         renderStats();
+        renderWeeklyChart();
     } catch (err) {
         console.error('Failed to load dashboard:', err);
     }
@@ -114,38 +92,18 @@ async function logSession(skillId, data) {
 
 // Render Functions
 function renderStats() {
-    statsContainer.innerHTML = `
-        <div class="stat-card">
-            <div class="label">Total Skills</div>
-            <div class="value">${dashboard.total_skills || 0}</div>
-        </div>
-        <div class="stat-card">
-            <div class="label">Hours Logged</div>
-            <div class="value">${(dashboard.total_hours || 0).toFixed(1)}</div>
-        </div>
-        <div class="stat-card">
-            <div class="label">Sessions</div>
-            <div class="value">${dashboard.total_logs || 0}</div>
-        </div>
-        <div class="stat-card">
-            <div class="label">Top Skill</div>
-            <div class="value" style="font-size:1.8rem">${dashboard.top_skill || 'N/A'}</div>
-        </div>
-    `;
-}
-
-function getLevelInfo(hours) {
-    if (hours >= 50) return { label: 'Expert', class: 'level-expert' };
-    if (hours >= 10) return { label: 'Intermediate', class: 'level-intermediate' };
-    return { label: 'Novice', class: 'level-novice' };
+    document.getElementById('stat-total-skills').textContent = String(dashboard.total_skills || 0).padStart(2, '0');
+    document.getElementById('stat-total-hours').textContent = (dashboard.total_hours || 0).toFixed(1);
+    document.getElementById('stat-total-sessions').textContent = String(dashboard.total_logs || 0).padStart(3, '0');
+    document.getElementById('stat-current-streak').textContent = String(dashboard.current_streak || 0).padStart(2, '0') + 'D';
+    document.getElementById('stat-top-skill').textContent = dashboard.top_skill || 'N/A';
 }
 
 function renderSkills() {
     if (!skills || skills.length === 0) {
         skillsGrid.innerHTML = `
             <div class="empty-state" style="grid-column: 1 / -1">
-                <h3>No skills yet</h3>
-                <p>Click "Add Skill" to start tracking your learning journey.</p>
+                NO DATA COMPONENTS FOUND.
             </div>
         `;
         return;
@@ -156,34 +114,34 @@ function renderSkills() {
             ? Math.min((skill.total_hours / skill.target_hours) * 100, 100)
             : 0;
             
-        const level = getLevelInfo(skill.total_hours);
+        const level = Math.floor(skill.total_hours / 10) + 1;
+        const xpToNext = 10 - (skill.total_hours % 10);
 
         return `
             <div class="skill-card">
-                <div class="skill-header">
-                    <span class="skill-name">${escapeHtml(skill.name)}</span>
-                    <div class="skill-badges">
-                        ${skill.category ? `<span class="skill-category">${escapeHtml(skill.category)}</span>` : ''}
-                        <span class="skill-level ${level.class}">${level.label}</span>
+                <div class="skill-top">
+                    <div>
+                        <span class="skill-name">${escapeHtml(skill.name)}</span>
+                        <div style="font-size: 0.7rem; color: var(--accent-2); margin-top: 2px;">LVL.${level} UNIT</div>
                     </div>
+                    <span class="skill-tag">${escapeHtml(skill.category || 'UNK')}</span>
                 </div>
                 
-                <div class="progress-container">
-                    <div class="progress-bar">
-                        <div class="fill" style="width: ${progress}%"></div>
-                    </div>
-                    <div class="progress-text">
-                        <span><strong>${skill.total_hours.toFixed(1)}</strong> hrs logged</span>
-                        <span>${skill.target_hours > 0 ? skill.target_hours + ' hrs goal' : 'No goal'}</span>
-                    </div>
+                <div class="skill-stats">
+                    <span>CAPACITY: <strong>${skill.total_hours.toFixed(1)}H</strong></span>
+                    <span>NEXT_RANK: ${xpToNext.toFixed(1)}H</span>
+                </div>
+                
+                <div class="bar-bg">
+                    <div class="bar-fill" style="width: ${progress}%"></div>
                 </div>
                 
                 <div class="skill-actions">
-                    <button class="btn btn-primary btn-sm" style="flex: 1;" onclick="openLogModal(${skill.id}, '${escapeHtml(skill.name)}')">
-                        + Log Time
+                    <button class="btn-hud" onclick="openLogModal(${skill.id}, '${escapeHtml(skill.name)}')">
+                        <i class="ph-bold ph-terminal-window"></i> LOG_DATA
                     </button>
-                    <button class="btn btn-secondary btn-sm" onclick="handleDelete(${skill.id})">
-                        Delete
+                    <button class="btn-hud" onclick="handleDelete(${skill.id})" style="flex: 0;">
+                        <i class="ph-bold ph-trash"></i>
                     </button>
                 </div>
             </div>
@@ -193,19 +151,18 @@ function renderSkills() {
 
 function renderActivityFeed() {
     if (!recentLogs || recentLogs.length === 0) {
-        activityFeed.innerHTML = '<div class="empty-state">No activity yet. Go log some hours!</div>';
+        activityFeed.innerHTML = '<div class="empty-state">NO TELEMETRY DATA</div>';
         return;
     }
 
     activityFeed.innerHTML = recentLogs.map(log => {
-        const dateStr = new Date(log.log_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const dateStr = new Date(log.log_date).toISOString().split('T')[0];
         return `
             <div class="activity-item">
-                <div class="activity-icon">⚡</div>
-                <div class="activity-details">
-                    <p>Logged <strong>${log.hours}h</strong> in <strong>${escapeHtml(log.skill_name)}</strong></p>
-                    ${log.notes ? `<p style="font-size: 0.85rem; color: var(--text-muted); font-style: italic;">"${escapeHtml(log.notes)}"</p>` : ''}
-                    <span class="activity-meta">${dateStr}</span>
+                <div class="act-time">[${dateStr}]</div>
+                <div class="act-content">
+                    ALLOCATED <strong>${log.hours}H</strong> TO <strong>${escapeHtml(log.skill_name)}</strong>
+                    ${log.notes ? `<br><span style="opacity: 0.7; font-size: 0.8rem; margin-top: 4px; display: inline-block;">> ${escapeHtml(log.notes)}</span>` : ''}
                 </div>
             </div>
         `;
@@ -215,43 +172,39 @@ function renderActivityFeed() {
 // Chart.js Setup
 window.categoryChartInstance = null;
 
-function updateChartTheme() {
-    if (!window.categoryChartInstance) return;
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = isDark ? '#f8fafc' : '#0f172a';
-    window.categoryChartInstance.options.plugins.legend.labels.color = textColor;
-    window.categoryChartInstance.update();
+function getChartColors() {
+    const rootStyles = getComputedStyle(document.documentElement);
+    const colorsStr = rootStyles.getPropertyValue('--chart-colors').trim();
+    return colorsStr.split(',').map(c => c.trim());
 }
 
 function renderChart() {
-    if (!skills || skills.length === 0) return;
+    if (!skills || skills.length === 0) {
+        const ctx = document.getElementById('categoryChart').getContext('2d');
+        ctx.clearRect(0,0, 400, 250);
+        return;
+    }
 
-    // Group hours by category
     const categoryData = {};
     skills.forEach(s => {
-        const cat = s.category || 'Other';
+        const cat = s.category || 'UNK';
         categoryData[cat] = (categoryData[cat] || 0) + s.total_hours;
     });
 
     const labels = Object.keys(categoryData);
     const data = Object.values(categoryData);
     
-    // Check if total is 0 to show empty chart
     const total = data.reduce((a,b) => a+b, 0);
-    if(total === 0) {
-        const ctx = document.getElementById('categoryChart').getContext('2d');
-        ctx.clearRect(0,0, 400, 250);
-        return;
-    }
+    if(total === 0) return;
 
     const ctx = document.getElementById('categoryChart').getContext('2d');
     
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const textColor = isDark ? '#f8fafc' : '#0f172a';
-
     if (window.categoryChartInstance) {
         window.categoryChartInstance.destroy();
     }
+
+    const rootStyles = getComputedStyle(document.documentElement);
+    const textMain = rootStyles.getPropertyValue('--text-main').trim();
 
     window.categoryChartInstance = new Chart(ctx, {
         type: 'doughnut',
@@ -259,15 +212,9 @@ function renderChart() {
             labels: labels,
             datasets: [{
                 data: data,
-                backgroundColor: [
-                    '#6366f1', // Indigo
-                    '#10b981', // Emerald
-                    '#f59e0b', // Amber
-                    '#f43f5e', // Rose
-                    '#8b5cf6', // Violet
-                    '#0ea5e9'  // Sky
-                ],
-                borderWidth: 0,
+                backgroundColor: getChartColors(),
+                borderWidth: 1,
+                borderColor: rootStyles.getPropertyValue('--accent-1').trim(),
                 hoverOffset: 10
             }]
         },
@@ -279,13 +226,97 @@ function renderChart() {
                 legend: {
                     position: 'right',
                     labels: {
-                        color: textColor,
+                        color: textMain,
+                        usePointStyle: true,
+                        padding: 20,
                         font: {
-                            family: "'Outfit', sans-serif",
-                            size: 13
-                        },
-                        padding: 20
+                            family: "'Share Tech Mono', monospace",
+                            size: 12
+                        }
                     }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 20, 30, 0.9)',
+                    titleColor: textMain,
+                    bodyColor: textMain,
+                    borderColor: rootStyles.getPropertyValue('--accent-1').trim(),
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 0,
+                    titleFont: { family: "'Share Tech Mono', monospace" },
+                    bodyFont: { family: "'Share Tech Mono', monospace" }
+                }
+            }
+        }
+    });
+}
+
+window.weeklyChartInstance = null;
+
+function renderWeeklyChart() {
+    if (!dashboard.weekly_activity) return;
+
+    const ctx = document.getElementById('weeklyChart').getContext('2d');
+    
+    const sortedDates = Object.keys(dashboard.weekly_activity).sort();
+    const labels = sortedDates.map(d => {
+        const date = new Date(d);
+        return date.toLocaleDateString(undefined, { weekday: 'short' });
+    });
+    const data = sortedDates.map(d => dashboard.weekly_activity[d]);
+
+    if (window.weeklyChartInstance) {
+        window.weeklyChartInstance.destroy();
+    }
+
+    const rootStyles = getComputedStyle(document.documentElement);
+    const accent1 = rootStyles.getPropertyValue('--accent-1').trim();
+    const textMain = rootStyles.getPropertyValue('--text-main').trim();
+
+    window.weeklyChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'HOURS',
+                data: data,
+                backgroundColor: accent1,
+                borderColor: accent1,
+                borderWidth: 1,
+                barThickness: 20
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0, 243, 255, 0.1)' },
+                    ticks: { 
+                        color: textMain,
+                        font: { family: "'Share Tech Mono', monospace" }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { 
+                        color: textMain,
+                        font: { family: "'Share Tech Mono', monospace" }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 20, 30, 0.9)',
+                    titleColor: accent1,
+                    bodyColor: textMain,
+                    borderColor: accent1,
+                    borderWidth: 1,
+                    cornerRadius: 0,
+                    titleFont: { family: "'Share Tech Mono', monospace" },
+                    bodyFont: { family: "'Share Tech Mono', monospace" }
                 }
             }
         }
@@ -328,11 +359,11 @@ addSkillForm.addEventListener('submit', async (e) => {
             target_hours: parseInt(document.getElementById('skill-target').value) || 0,
         });
         closeAddModal();
-        showToast('Skill added successfully!', 'success');
+        showToast('COMPONENT INITIATED', 'success');
         loadDashboard();
         loadSkills();
     } catch (err) {
-        showToast('Failed to add skill', 'error');
+        showToast('ERROR INITIATING', 'error');
     }
 });
 
@@ -345,26 +376,46 @@ logSessionForm.addEventListener('submit', async (e) => {
             log_date: document.getElementById('log-date').value,
         });
         closeLogModal();
-        showToast('Session logged successfully!', 'success');
-        loadDashboard();
-        loadSkills();
-        loadRecentLogs(); // refresh feed
-    } catch (err) {
-        showToast('Failed to log session', 'error');
-    }
-});
-
-async function handleDelete(id) {
-    if (!confirm('Are you sure? This will delete the skill and all associated logs.')) return;
-    try {
-        await deleteSkill(id);
-        showToast('Skill deleted', 'success');
+        showToast('DATA COMMITTED', 'success');
         loadDashboard();
         loadSkills();
         loadRecentLogs();
     } catch (err) {
-        showToast('Failed to delete skill', 'error');
+        showToast('COMMIT FAILED', 'error');
     }
+});
+
+async function handleDelete(id) {
+    if (!confirm('WARN: ERASE COMPONENT FROM DATABASE?')) return;
+    try {
+        await deleteSkill(id);
+        showToast('COMPONENT ERASED', 'success');
+        loadDashboard();
+        loadSkills();
+        loadRecentLogs();
+    } catch (err) {
+        showToast('ERASE FAILED', 'error');
+    }
+}
+
+// Export Function
+function exportData() {
+    if (!skills || skills.length === 0) {
+        showToast('NO DATA TO EXPORT', 'error');
+        return;
+    }
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + "ID,Name,Category,TargetHours,TotalHours\n"
+        + skills.map(e => `${e.id},${e.name},${e.category},${e.target_hours},${e.total_hours}`).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "skillpulse_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('DATA EXPORT INITIATED', 'success');
 }
 
 // Utilities
@@ -375,10 +426,23 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-function showToast(message, type = 'success') {
+function showToast(message, type = 'default') {
     const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = `toast ${type} show`;
+    const msg = document.getElementById('toast-msg');
+    const icon = document.getElementById('toast-icon');
+    
+    toast.className = 'toast show';
+    if(type === 'success') {
+        toast.classList.add('success');
+        icon.className = 'ph-bold ph-check-circle';
+    } else if(type === 'error') {
+        toast.classList.add('error');
+        icon.className = 'ph-bold ph-warning-circle';
+    } else {
+        icon.className = 'ph-bold ph-info';
+    }
+    
+    msg.textContent = message;
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 

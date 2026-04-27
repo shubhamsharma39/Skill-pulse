@@ -36,5 +36,7 @@ type Dashboard struct {
 	TotalSkills int     `json:"total_skills"`
 	TotalHours  float64 `json:"total_hours"`
 	TotalLogs   int     `json:"total_logs"`
-	TopSkill    string  `json:"top_skill"`
+	TopSkill       string             `json:"top_skill"`
+	CurrentStreak  int                `json:"current_streak"`
+	WeeklyActivity map[string]float64 `json:"weekly_activity"`
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/trainwithshubham/skillpulse/database"
@@ -24,6 +25,53 @@ func GetDashboard(c *gin.Context) {
 	`).Scan(&dash.TopSkill)
 	if err != nil {
 		dash.TopSkill = "N/A"
+	}
+
+	// Calculate Streak
+	rows, err := database.DB.Query("SELECT DISTINCT log_date FROM learning_logs ORDER BY log_date DESC")
+	streak := 0
+	if err == nil {
+		defer rows.Close()
+		var dates []string
+		for rows.Next() {
+			var d string
+			if err := rows.Scan(&d); err == nil {
+				dates = append(dates, d)
+			}
+		}
+		
+		if len(dates) > 0 {
+			streak = 1
+			for i := 1; i < len(dates); i++ {
+				t1, _ := time.Parse("2006-01-02", dates[i-1])
+				t2, _ := time.Parse("2006-01-02", dates[i])
+				if t1.Sub(t2).Hours() <= 24 {
+					streak++
+				} else {
+					break
+				}
+			}
+		}
+	}
+	dash.CurrentStreak = streak
+
+	// Calculate Weekly Activity (Last 7 Days)
+	dash.WeeklyActivity = make(map[string]float64)
+	for i := 0; i < 7; i++ {
+		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+		dash.WeeklyActivity[date] = 0
+	}
+
+	rows, err = database.DB.Query("SELECT log_date, SUM(hours) FROM learning_logs WHERE log_date >= ? GROUP BY log_date", time.Now().AddDate(0, 0, -6).Format("2006-01-02"))
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var d string
+			var h float64
+			if err := rows.Scan(&d, &h); err == nil {
+				dash.WeeklyActivity[d] = h
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, dash)
