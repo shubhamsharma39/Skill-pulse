@@ -2,7 +2,7 @@
 
 SkillPulse is a futuristic, high-end **Skill Tracking & Analytics Dashboard** designed with a Sci-Fi Holographic HUD aesthetic. It allows users to monitor their learning progress, track daily streaks, and visualize their skill matrix through a technical, data-driven interface.
 
-![SkillPulse UI Preview](https://github.com/shubhamsharma39/Skill-pulse/raw/main/preview.png) *(Placeholder for your actual preview image)*
+![SkillPulse UI Preview](preview.png)
 
 ---
 
